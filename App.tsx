@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { RootTabs } from './src/navigation/RootTabs';
+import { RootNavigator } from './src/navigation/RootNavigator';
 import { OnboardingFlow } from './src/screens/OnboardingFlow';
 import { useOnboardingStore } from './src/store/useOnboardingStore';
 import { colors } from './src/theme/tokens';
@@ -31,7 +31,7 @@ export default function App() {
         <StatusBar style="dark" />
         {setupComplete ? (
           <NavigationContainer theme={navTheme}>
-            <RootTabs />
+            <RootNavigator />
           </NavigationContainer>
         ) : (
           <OnboardingFlow />

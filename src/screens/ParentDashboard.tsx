@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { Card } from '../components/Card';
 import { formatRewardAmount, rewardSummary } from '../domain/rewards';
@@ -7,6 +8,7 @@ import { useKudoLoopStore } from '../store/useKudoLoopStore';
 import { colors, radius, spacing } from '../theme/tokens';
 
 export function ParentDashboard() {
+  const navigation = useNavigation();
   const users = useKudoLoopStore((state) => state.users);
   const children = useKudoLoopStore((state) => state.children);
   const tasks = useKudoLoopStore((state) => state.tasks);
@@ -34,6 +36,13 @@ export function ParentDashboard() {
           <Metric label="Overdue" value={String(overdueTasks.length)} />
           <Metric label="Requests" value={String(requestedRedemptions.length)} />
         </View>
+        <Pressable
+          style={styles.primaryButton}
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('CreateChore')}
+        >
+          <Text style={styles.primaryButtonText}>+ New chore</Text>
+        </Pressable>
       </Card>
 
       <Text style={styles.heading}>Children</Text>

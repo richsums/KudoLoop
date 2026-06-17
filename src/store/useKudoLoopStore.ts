@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { mockFamily } from '../data/mockFamily';
+import { buildChore, type NewChoreInput } from '../domain/chores';
 import { applyRewardMutation, buildRequestId } from '../domain/rewards';
 import type {
   ChildProfile,
@@ -25,6 +26,7 @@ type StoreState = {
   redemptions: Redemption[];
   processedRequestIds: string[];
   hydrate: (snapshot: KudoLoopStateSnapshot) => void;
+  addChore: (input: NewChoreInput) => void;
   submitTaskProof: (taskId: string, childId: string, note: string) => void;
   approveTask: (taskId: string, parentId: string) => void;
   rejectTask: (taskId: string, parentId: string, note: string) => void;
@@ -96,6 +98,15 @@ function snapshotToState(snapshot: KudoLoopStateSnapshot) {
 export const useKudoLoopStore = create<StoreState>((set, get) => ({
   ...snapshotToState(mockFamily),
   hydrate: (snapshot) => set(snapshotToState(snapshot)),
+  addChore: (input) => {
+    set((state) => {
+      const { template, tasks } = buildChore(input, state.family.id, `${Date.now()}`, new Date().toISOString());
+      return {
+        templates: [template, ...state.templates],
+        tasks: [...tasks, ...state.tasks],
+      };
+    });
+  },
   submitTaskProof: (taskId, childId, note) => {
     const familyId = get().family.id;
     const proof: ProofAsset = {
