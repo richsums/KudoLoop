@@ -6,6 +6,7 @@ import { BrandAndComplianceScreen } from '../screens/BrandAndComplianceScreen';
 import { ChildDashboard } from '../screens/ChildDashboard';
 import { DeviceSetupScreen } from '../screens/DeviceSetupScreen';
 import { ParentDashboard } from '../screens/ParentDashboard';
+import { WeeklyReportScreen } from '../screens/WeeklyReportScreen';
 import { colors, spacing } from '../theme/tokens';
 import { BrandHeader } from './BrandHeader';
 
@@ -51,8 +52,17 @@ function BrandTab() {
   );
 }
 
+function ReportTab() {
+  return (
+    <Scrollable>
+      <WeeklyReportScreen />
+    </Scrollable>
+  );
+}
+
 const tabEmoji: Record<string, string> = {
   Parent: '🏠',
+  Report: '📊',
   Kid: '⭐',
   Devices: '📱',
   Brand: '🎨',
@@ -74,6 +84,7 @@ export function RootTabs() {
       })}
     >
       <Tab.Screen name="Parent" component={ParentTab} />
+      <Tab.Screen name="Report" component={ReportTab} />
       <Tab.Screen name="Kid" component={ChildTab} />
       <Tab.Screen name="Devices" component={DevicesTab} />
       <Tab.Screen name="Brand" component={BrandTab} />
