@@ -52,4 +52,25 @@ describe('buildFamilyFromOnboarding', () => {
     expect(snapshot.family.name).toBe('My Family');
     expect(snapshot.users[0].displayName).toBe('Parent');
   });
+
+  it('includes co-parents/caregivers with their roles and permissions', () => {
+    const snapshot = buildFamilyFromOnboarding(
+      {
+        ...draft,
+        adults: [
+          { id: 'adult-1', name: 'Alex', role: 'parent', permissions: ['approve_tasks', 'manage_rewards', 'manage_members', 'manage_assignments'] },
+          { id: 'adult-2', name: 'Sam', role: 'caregiver', permissions: ['approve_tasks'] },
+        ],
+      },
+      { nowIso: '2026-06-17T12:00:00.000Z' },
+    );
+
+    // primary parent + 2 adults + 2 kids
+    expect(snapshot.users).toHaveLength(5);
+    const sam = snapshot.users.find((user) => user.id === 'adult-2');
+    expect(sam).toMatchObject({ role: 'caregiver', displayName: 'Sam' });
+    expect(sam?.permissions).toEqual(['approve_tasks']);
+    // primary parent always gets every permission
+    expect(snapshot.users[0].permissions).toHaveLength(4);
+  });
 });

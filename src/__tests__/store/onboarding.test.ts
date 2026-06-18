@@ -17,15 +17,41 @@ describe('isStepComplete', () => {
     expect(isStepComplete(1, { familyName: 'Crew', parentName: 'Richard', kids: [] })).toBe(true);
   });
 
-  it('requires at least one kid on the kids step', () => {
-    expect(isStepComplete(2, { familyName: 'Crew', parentName: 'Richard', kids: [] })).toBe(false);
+  it('treats the members step (2) as optional', () => {
+    expect(isStepComplete(2, { familyName: 'Crew', parentName: 'Richard', kids: [] })).toBe(true);
+  });
+
+  it('requires at least one kid on the kids step (3)', () => {
+    expect(isStepComplete(3, { familyName: 'Crew', parentName: 'Richard', kids: [] })).toBe(false);
     expect(
-      isStepComplete(2, {
+      isStepComplete(3, {
         familyName: 'Crew',
         parentName: 'Richard',
         kids: [{ id: 'kid-1', name: 'Maya', dailyMinutes: 45 }],
       }),
     ).toBe(true);
+  });
+});
+
+describe('family members (adults)', () => {
+  it('adds adults with role-based default permissions and supports toggling', () => {
+    const store = useOnboardingStore.getState();
+    store.addAdult('Alex', 'parent');
+    store.addAdult('Sam', 'caregiver');
+    store.addAdult('  ', 'parent'); // blank ignored
+
+    let adults = useOnboardingStore.getState().adults;
+    expect(adults).toHaveLength(2);
+    expect(adults[0]).toMatchObject({ name: 'Alex', role: 'parent' });
+    expect(adults[0].permissions).toHaveLength(4); // parent gets all
+    expect(adults[1].permissions).toEqual(['approve_tasks']); // caregiver default
+
+    useOnboardingStore.getState().toggleAdultPermission(adults[1].id, 'manage_rewards');
+    adults = useOnboardingStore.getState().adults;
+    expect(adults[1].permissions).toContain('manage_rewards');
+
+    useOnboardingStore.getState().removeAdult(adults[0].id);
+    expect(useOnboardingStore.getState().adults).toHaveLength(1);
   });
 });
 

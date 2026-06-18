@@ -1,4 +1,4 @@
-import type { OnboardingDraft } from '../store/useOnboardingStore';
+import { ALL_PERMISSIONS, type OnboardingDraft } from '../store/useOnboardingStore';
 import {
   DEFAULT_REWARD_CONFIG,
   type ChildProfile,
@@ -75,7 +75,19 @@ export function buildFamilyFromOnboarding(
     displayName: draft.parentName.trim() || 'Parent',
     avatar: avatarFor(draft.parentName),
     authUserId: `auth-${PARENT_ID}`,
+    permissions: [...ALL_PERMISSIONS],
   };
+
+  // Additional adults (co-parents / caregivers) added during onboarding.
+  const adultUsers: UserProfile[] = (draft.adults ?? []).map((adult) => ({
+    id: adult.id,
+    familyId: FAMILY_ID,
+    role: adult.role,
+    displayName: adult.name,
+    avatar: avatarFor(adult.name),
+    authUserId: `auth-${adult.id}`,
+    permissions: adult.permissions,
+  }));
 
   const childUsers: UserProfile[] = draft.kids.map((kid) => ({
     id: kid.id,
@@ -123,7 +135,7 @@ export function buildFamilyFromOnboarding(
       subscriptionTier: 'free',
       createdByParentId: PARENT_ID,
     },
-    users: [parent, ...childUsers],
+    users: [parent, ...adultUsers, ...childUsers],
     children,
     templates,
     tasks,

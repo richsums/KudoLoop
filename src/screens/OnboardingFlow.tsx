@@ -14,11 +14,25 @@ import { StatusBar } from 'expo-status-bar';
 
 import { Card } from '../components/Card';
 import { buildFamilyFromOnboarding } from '../domain/buildFamily';
-import { TOTAL_STEPS, isStepComplete, useOnboardingStore } from '../store/useOnboardingStore';
+import type { Permission } from '../domain/types';
+import {
+  ALL_PERMISSIONS,
+  TOTAL_STEPS,
+  isStepComplete,
+  useOnboardingStore,
+  type OnboardingAdult,
+} from '../store/useOnboardingStore';
 import { useKudoLoopStore } from '../store/useKudoLoopStore';
 import { colors, radius, spacing } from '../theme/tokens';
 
-const stepTitles = ['Welcome to KudoLoop', 'Set up your family', 'Add your kids'];
+const stepTitles = ['Welcome to KudoLoop', 'Set up your family', 'Family members', 'Add your kids'];
+
+const permissionLabels: Record<Permission, string> = {
+  approve_tasks: 'Approve tasks',
+  manage_rewards: 'Manage rewards',
+  manage_members: 'Manage members',
+  manage_assignments: 'Assign chores',
+};
 
 function resolveTimezone(): string | undefined {
   try {
@@ -32,9 +46,13 @@ export function OnboardingFlow() {
   const step = useOnboardingStore((state) => state.step);
   const familyName = useOnboardingStore((state) => state.familyName);
   const parentName = useOnboardingStore((state) => state.parentName);
+  const adults = useOnboardingStore((state) => state.adults);
   const kids = useOnboardingStore((state) => state.kids);
   const setFamilyName = useOnboardingStore((state) => state.setFamilyName);
   const setParentName = useOnboardingStore((state) => state.setParentName);
+  const addAdult = useOnboardingStore((state) => state.addAdult);
+  const removeAdult = useOnboardingStore((state) => state.removeAdult);
+  const toggleAdultPermission = useOnboardingStore((state) => state.toggleAdultPermission);
   const addKid = useOnboardingStore((state) => state.addKid);
   const removeKid = useOnboardingStore((state) => state.removeKid);
   const nextStep = useOnboardingStore((state) => state.nextStep);
@@ -42,15 +60,16 @@ export function OnboardingFlow() {
   const completeSetup = useOnboardingStore((state) => state.completeSetup);
   const hydrate = useKudoLoopStore((state) => state.hydrate);
 
-  const canProceed = isStepComplete(step, { familyName, parentName, kids });
+  const draft = { familyName, parentName, adults, kids };
+  const canProceed = isStepComplete(step, draft);
   const isLastStep = step === TOTAL_STEPS - 1;
 
   const handleCreateFamily = () => {
-    if (!isStepComplete(2, { familyName, parentName, kids })) {
+    if (!isStepComplete(TOTAL_STEPS - 1, draft)) {
       return;
     }
 
-    hydrate(buildFamilyFromOnboarding({ familyName, parentName, kids }, { timezone: resolveTimezone() }));
+    hydrate(buildFamilyFromOnboarding(draft, { timezone: resolveTimezone() }));
     completeSetup();
   };
 
@@ -88,7 +107,16 @@ export function OnboardingFlow() {
               onParentName={setParentName}
             />
           ) : null}
-          {step === 2 ? <KidsStep kids={kids} onAddKid={addKid} onRemoveKid={removeKid} /> : null}
+          {step === 2 ? (
+            <MembersStep
+              parentName={parentName}
+              adults={adults}
+              onAddAdult={addAdult}
+              onRemoveAdult={removeAdult}
+              onTogglePermission={toggleAdultPermission}
+            />
+          ) : null}
+          {step === 3 ? <KidsStep kids={kids} onAddKid={addKid} onRemoveKid={removeKid} /> : null}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -160,6 +188,99 @@ function FamilyStep({
         You will be the family admin. Only parents can approve tasks, change rewards, and manage
         members.
       </Text>
+    </View>
+  );
+}
+
+function MembersStep({
+  parentName,
+  adults,
+  onAddAdult,
+  onRemoveAdult,
+  onTogglePermission,
+}: {
+  parentName: string;
+  adults: OnboardingAdult[];
+  onAddAdult: (name: string, role: 'parent' | 'caregiver') => void;
+  onRemoveAdult: (id: string) => void;
+  onTogglePermission: (id: string, permission: Permission) => void;
+}) {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'parent' | 'caregiver'>('parent');
+
+  const handleAdd = () => {
+    onAddAdult(name, role);
+    setName('');
+    setRole('parent');
+  };
+
+  return (
+    <View style={styles.stack}>
+      <Card tone="mint">
+        <Text style={styles.cardTitle}>{parentName.trim() || 'You'} · Admin</Text>
+        <Text style={styles.body}>The family creator is the admin with every permission.</Text>
+      </Card>
+
+      <Text style={styles.helper}>Add other parents or caregivers (optional). You can fine-tune what each can do.</Text>
+      <Field label="Member name" placeholder="Alex" value={name} onChangeText={setName} />
+      <View style={styles.roleRow}>
+        {(['parent', 'caregiver'] as const).map((value) => (
+          <Pressable
+            key={value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: role === value }}
+            onPress={() => setRole(value)}
+            style={[styles.roleChip, role === value ? styles.roleChipSelected : null]}
+          >
+            <Text style={[styles.roleChipText, role === value ? styles.roleChipTextSelected : null]}>
+              {value === 'parent' ? 'Parent' : 'Caregiver'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        style={[styles.secondaryButton, name.trim() ? null : styles.secondaryButtonDisabled]}
+        disabled={!name.trim()}
+        accessibilityRole="button"
+        onPress={handleAdd}
+      >
+        <Text style={styles.secondaryButtonText}>Add member</Text>
+      </Pressable>
+
+      {adults.map((adult) => (
+        <Card key={adult.id}>
+          <View style={styles.kidRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{adult.name.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{adult.name}</Text>
+              <Text style={styles.meta}>{adult.role === 'parent' ? 'Parent' : 'Caregiver'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => onRemoveAdult(adult.id)} style={styles.removeButton}>
+              <Text style={styles.removeButtonText}>Remove</Text>
+            </Pressable>
+          </View>
+          <View style={styles.permWrap}>
+            {ALL_PERMISSIONS.map((permission) => {
+              const on = adult.permissions.includes(permission);
+              return (
+                <Pressable
+                  key={permission}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => onTogglePermission(adult.id, permission)}
+                  style={[styles.permChip, on ? styles.permChipOn : null]}
+                >
+                  <Text style={[styles.permChipText, on ? styles.permChipTextOn : null]}>
+                    {permissionLabels[permission]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+      ))}
     </View>
   );
 }
@@ -440,5 +561,56 @@ const styles = StyleSheet.create({
     color: colors.tealDark,
     fontSize: 16,
     fontWeight: '900',
+  },
+  roleRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  roleChip: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: spacing.sm,
+  },
+  roleChipSelected: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  roleChipText: {
+    color: colors.navy,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  roleChipTextSelected: {
+    color: colors.white,
+  },
+  permWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  permChip: {
+    backgroundColor: colors.cloud,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  permChipOn: {
+    backgroundColor: colors.mint,
+    borderColor: '#BCECE7',
+  },
+  permChipText: {
+    color: colors.gray,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  permChipTextOn: {
+    color: colors.tealDark,
   },
 });
