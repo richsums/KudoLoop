@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKudoLoopStore } from '../store/useKudoLoopStore';
@@ -7,7 +8,9 @@ import { colors, spacing } from '../theme/tokens';
 
 export function BrandHeader() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const familyName = useKudoLoopStore((state) => state.family.name);
+  const unread = useKudoLoopStore((state) => state.notifications.filter((item) => !item.read).length);
   const restart = useOnboardingStore((state) => state.restart);
 
   return (
@@ -21,6 +24,20 @@ export function BrandHeader() {
           <Text style={styles.reset}>Restart setup</Text>
         </Pressable>
       </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Notifications${unread > 0 ? `, ${unread} unread` : ''}`}
+        onPress={() => navigation.navigate('Notifications')}
+        style={styles.bell}
+        hitSlop={8}
+      >
+        <Text style={styles.bellIcon}>🔔</Text>
+        {unread > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+          </View>
+        ) : null}
+      </Pressable>
       <View style={styles.logo}>
         <Text style={styles.logoText}>KL</Text>
       </View>
@@ -60,6 +77,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 4,
     textDecorationLine: 'underline',
+  },
+  bell: {
+    marginLeft: spacing.sm,
+    padding: spacing.xs,
+  },
+  bellIcon: {
+    fontSize: 22,
+  },
+  badge: {
+    alignItems: 'center',
+    backgroundColor: colors.coral,
+    borderRadius: 9,
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '900',
   },
   logo: {
     alignItems: 'center',

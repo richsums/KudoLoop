@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Card } from '../components/Card';
 import { SegmentedTabs } from '../components/SegmentedTabs';
+import { goalProgress, pointsToMoney, pointsToScreenMinutes } from '../domain/incentives';
 import { formatRewardAmount, rewardSummary } from '../domain/rewards';
 import type { TaskInstance } from '../domain/types';
 import { isSupabaseConfigured } from '../lib/env';
@@ -10,23 +11,35 @@ import { pickProofImage, uploadProofImage } from '../lib/proof';
 import { useKudoLoopStore } from '../store/useKudoLoopStore';
 import { colors, radius, spacing } from '../theme/tokens';
 
+const SCREEN_TRADE_POINTS = 100;
+const CASHOUT_POINTS = 200;
+
 export function ChildDashboard() {
   const childUsers = useKudoLoopStore((state) => state.users.filter((candidate) => candidate.role === 'child'));
   const templates = useKudoLoopStore((state) => state.templates);
   const children = useKudoLoopStore((state) => state.children);
   const allTasks = useKudoLoopStore((state) => state.tasks);
   const allRedemptions = useKudoLoopStore((state) => state.redemptions);
+  const allIncentives = useKudoLoopStore((state) => state.incentives);
+  const allWishlist = useKudoLoopStore((state) => state.wishlist);
+  const rewardConfig = useKudoLoopStore((state) => state.rewardConfig);
   const familyId = useKudoLoopStore((state) => state.family.id);
   const submitTaskProof = useKudoLoopStore((state) => state.submitTaskProof);
   const requestRedemption = useKudoLoopStore((state) => state.requestRedemption);
+  const requestCashout = useKudoLoopStore((state) => state.requestCashout);
+  const addWishlistItem = useKudoLoopStore((state) => state.addWishlistItem);
+  const removeWishlistItem = useKudoLoopStore((state) => state.removeWishlistItem);
 
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [wishlistText, setWishlistText] = useState('');
   const activeChildId = selectedChildId ?? childUsers[0]?.id ?? null;
 
   const child = children.find((candidate) => candidate.userId === activeChildId);
   const user = childUsers.find((candidate) => candidate.id === activeChildId);
   const tasks = allTasks.filter((task) => task.childId === activeChildId);
   const redemptions = allRedemptions.filter((item) => item.childId === activeChildId);
+  const incentives = allIncentives.filter((item) => item.childId === activeChildId && item.active);
+  const wishlist = allWishlist.filter((item) => item.childId === activeChildId);
 
   if (!child || !user || !activeChildId) {
     return (
@@ -71,9 +84,10 @@ export function ChildDashboard() {
         <Text style={styles.heroTitle}>Hi {user.displayName}, earn your next 20 minutes.</Text>
         <Text style={styles.body}>Finish quests, send proof when needed, and watch your screen bank grow.</Text>
         <View style={styles.balanceRow}>
+          <Balance label="Points" value={formatRewardAmount('points', child.balances.points)} />
           <Balance label="Screen" value={formatRewardAmount('screen_minutes', child.balances.screen_minutes)} />
           <Balance label="Allowance" value={formatRewardAmount('money', child.balances.money)} />
-          <Balance label="Streak" value={`${child.streakDays} days`} />
+          <Balance label="Streak" value={`${child.streakDays}d`} />
         </View>
         <Pressable
           style={styles.primaryButton}
@@ -115,20 +129,103 @@ export function ChildDashboard() {
         );
       })}
 
-      <Text style={styles.heading}>Reward store</Text>
+      <Text style={styles.heading}>Cash in your points</Text>
       <Card tone="mint">
-        <Text style={styles.cardTitle}>Screen-time rewards</Text>
-        <Text style={styles.body}>Redeem approved minutes for iPad, PS5, phone, or computer time.</Text>
+        <Text style={styles.cardTitle}>You have {child.balances.points} points</Text>
+        <Text style={styles.body}>
+          That’s worth about ${pointsToMoney(child.balances.points, rewardConfig).toFixed(2)} or{' '}
+          {pointsToScreenMinutes(child.balances.points, rewardConfig)} screen minutes.
+        </Text>
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.secondaryButton, styles.flex, child.balances.points < SCREEN_TRADE_POINTS ? styles.disabled : null]}
+            disabled={child.balances.points < SCREEN_TRADE_POINTS}
+            accessibilityRole="button"
+            onPress={() =>
+              requestRedemption(childId, 'screen_minutes', pointsToScreenMinutes(SCREEN_TRADE_POINTS, rewardConfig), 'device')
+            }
+          >
+            <Text style={styles.secondaryButtonText}>Trade {SCREEN_TRADE_POINTS} pts → screen time</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.secondaryButton, styles.flex, child.balances.points < CASHOUT_POINTS ? styles.disabled : null]}
+            disabled={child.balances.points < CASHOUT_POINTS}
+            accessibilityRole="button"
+            onPress={() => requestCashout(childId, CASHOUT_POINTS)}
+          >
+            <Text style={styles.secondaryButtonText}>Cash out {CASHOUT_POINTS} pts</Text>
+          </Pressable>
+        </View>
       </Card>
+
+      <Text style={styles.heading}>Working toward</Text>
+      {incentives.length === 0 ? (
+        <Card>
+          <Text style={styles.meta}>No goals yet — add ideas to your wishlist below.</Text>
+        </Card>
+      ) : (
+        incentives.map((incentive) => {
+          const progress = goalProgress(incentive.pointCost, child.balances.points);
+          return (
+            <Card key={incentive.id}>
+              <Text style={styles.cardTitle}>{incentive.title}</Text>
+              <Text style={styles.meta}>
+                {child.balances.points} / {incentive.pointCost} pts ·{' '}
+                {incentive.type === 'screen_time' ? 'screen time' : incentive.type}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+            </Card>
+          );
+        })
+      )}
+
+      <Text style={styles.heading}>My wishlist</Text>
       <Card>
-        <Text style={styles.cardTitle}>Custom family perk</Text>
-        <Text style={styles.body}>Trade points for parent-created incentives like movie pick or dessert helper.</Text>
+        <View style={styles.actionRow}>
+          <TextInput
+            style={[styles.input, styles.flex]}
+            placeholder="Something you want to earn"
+            placeholderTextColor={colors.gray}
+            value={wishlistText}
+            onChangeText={setWishlistText}
+          />
+          <Pressable
+            style={[styles.addButton, wishlistText.trim() ? null : styles.disabled]}
+            disabled={!wishlistText.trim()}
+            accessibilityRole="button"
+            onPress={() => {
+              addWishlistItem(childId, wishlistText.trim());
+              setWishlistText('');
+            }}
+          >
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        </View>
       </Card>
+      {wishlist.map((item) => (
+        <Card key={item.id}>
+          <View style={styles.taskHeader}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.meta}>{item.status === 'promoted' ? 'Parent made this a goal! 🎉' : 'Sent to your parent'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => removeWishlistItem(item.id)} hitSlop={6}>
+              <Text style={styles.removeText}>Remove</Text>
+            </Pressable>
+          </View>
+        </Card>
+      ))}
 
       <Text style={styles.heading}>Requests</Text>
       {redemptions.slice(0, 3).map((redemption) => (
         <Card key={redemption.id}>
-          <Text style={styles.cardTitle}>{redemption.amount} minutes for {redemption.targetDevice}</Text>
+          <Text style={styles.cardTitle}>
+            {redemption.rewardType === 'points'
+              ? `Cash out ${redemption.amount} pts`
+              : `${redemption.amount} minutes${redemption.targetDevice ? ` for ${redemption.targetDevice}` : ''}`}
+          </Text>
           <Text style={styles.meta}>Status: {redemption.status}</Text>
         </Card>
       ))}
@@ -261,6 +358,55 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.tealDark,
+    fontSize: 13,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  disabled: {
+    opacity: 0.4,
+  },
+  progressTrack: {
+    backgroundColor: colors.line,
+    borderRadius: 6,
+    height: 10,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    backgroundColor: colors.teal,
+    borderRadius: 6,
+    height: 10,
+  },
+  input: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    color: colors.navy,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: colors.teal,
+    borderRadius: radius.sm,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  addButtonText: {
+    color: colors.white,
+    fontWeight: '900',
+  },
+  removeText: {
+    color: colors.red,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

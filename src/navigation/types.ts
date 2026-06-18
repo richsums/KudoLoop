@@ -1,6 +1,18 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+export type TabParamList = {
+  Parent: undefined;
+  Report: undefined;
+  Kid: undefined;
+  Devices: undefined;
+  Brand: undefined;
+};
+
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParamList> | undefined;
   CreateChore: undefined;
+  ManageKid: { childId: string };
+  Notifications: undefined;
 };
 
 // Make `useNavigation()` aware of the stack routes app-wide so navigate()/goBack

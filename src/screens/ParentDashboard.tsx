@@ -65,12 +65,21 @@ export function ParentDashboard() {
               <Metric label="Allowance" value={formatRewardAmount('money', child.balances.money)} />
               <Metric label="Points" value={formatRewardAmount('points', child.balances.points)} />
             </View>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => awardManualBonus(child.userId, 'screen_minutes', 10, 'Parent quick bonus', parentId)}
-            >
-              <Text style={styles.secondaryButtonText}>Award 10 bonus minutes</Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => awardManualBonus(child.userId, 'screen_minutes', 10, 'Parent quick bonus', parentId)}
+              >
+                <Text style={styles.secondaryButtonText}>Award 10 min</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryButton}
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('ManageKid', { childId: child.userId })}
+              >
+                <Text style={styles.secondaryButtonText}>Manage</Text>
+              </Pressable>
+            </View>
           </Card>
         );
       })}

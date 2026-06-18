@@ -9,8 +9,9 @@ import { ParentDashboard } from '../screens/ParentDashboard';
 import { WeeklyReportScreen } from '../screens/WeeklyReportScreen';
 import { colors, spacing } from '../theme/tokens';
 import { BrandHeader } from './BrandHeader';
+import type { TabParamList } from './types';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 function Scrollable({ children }: PropsWithChildren) {
   return (
