@@ -1,4 +1,4 @@
-import type { KudoLoopStateSnapshot } from '../domain/types';
+import { DEFAULT_REWARD_CONFIG, type KudoLoopStateSnapshot } from '../domain/types';
 
 export const mockFamily: KudoLoopStateSnapshot = {
   family: {
@@ -180,4 +180,28 @@ export const mockFamily: KudoLoopStateSnapshot = {
       requestedAt: new Date().toISOString(),
     },
   ],
+  incentives: [
+    {
+      id: 'incentive-bike-eli',
+      childId: 'child-eli',
+      title: 'New mountain bike',
+      type: 'item',
+      pointCost: 2000,
+      createdBy: 'parent-richard',
+      createdAt: new Date().toISOString(),
+      active: true,
+    },
+  ],
+  wishlist: [
+    {
+      id: 'wish-switch-maya',
+      childId: 'child-maya',
+      title: 'Nintendo Switch game',
+      note: 'The new Mario one',
+      createdAt: new Date().toISOString(),
+      status: 'open',
+    },
+  ],
+  notifications: [],
+  rewardConfig: DEFAULT_REWARD_CONFIG,
 };

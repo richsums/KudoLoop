@@ -8,6 +8,8 @@ export type NewChoreInput = {
   proofRequired: boolean;
   childIds: string[];
   recurrenceRule?: string;
+  estimatedDurationMinutes?: number;
+  subject?: string;
 };
 
 const rewardLabels: Record<RewardType, string> = {
@@ -24,6 +26,8 @@ const categoryRecurrence: Record<TaskCategory, string> = {
   paid_chore: 'FREQ=WEEKLY',
   school_achievement: 'FREQ=ADHOC',
   custom_goal: 'FREQ=ADHOC',
+  schoolwork: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  special_project: 'FREQ=ADHOC',
 };
 
 /**
@@ -49,6 +53,8 @@ export function buildChore(
     defaultProofRequired: input.proofRequired,
     approvalMode: 'parent_required',
     active: true,
+    estimatedDurationMinutes: input.estimatedDurationMinutes,
+    subject: input.subject,
     rewardRules: [
       {
         id: `reward-${templateId}`,

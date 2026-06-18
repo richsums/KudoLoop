@@ -1,5 +1,12 @@
 import type { OnboardingDraft } from '../store/useOnboardingStore';
-import type { ChildProfile, KudoLoopStateSnapshot, TaskInstance, TaskTemplate, UserProfile } from './types';
+import {
+  DEFAULT_REWARD_CONFIG,
+  type ChildProfile,
+  type KudoLoopStateSnapshot,
+  type TaskInstance,
+  type TaskTemplate,
+  type UserProfile,
+} from './types';
 
 export const PARENT_ID = 'parent-1';
 export const FAMILY_ID = 'family-1';
@@ -122,5 +129,9 @@ export function buildFamilyFromOnboarding(
     tasks,
     ledger: [],
     redemptions: [],
+    incentives: [],
+    wishlist: [],
+    notifications: [],
+    rewardConfig: DEFAULT_REWARD_CONFIG,
   };
 }
