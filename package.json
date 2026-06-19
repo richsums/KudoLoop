@@ -36,7 +36,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export -p web && touch dist/.nojekyll && cp dist/index.html dist/404.html",
-    "deploy:web": "npm run build:web && gh-pages -d dist -t true",
+    "deploy:web": "npm run build:web && gh-pages -d dist --dotfiles",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
