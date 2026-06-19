@@ -4,6 +4,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 
 import { Card } from '../components/Card';
 import { CHORE_CATALOG, CHORE_GROUPS, SCHOOLWORK_CATALOG } from '../domain/catalog';
+import { can, resolveActiveUser } from '../domain/permissions';
 import { formatRewardAmount } from '../domain/rewards';
 import type { IncentiveType } from '../domain/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -25,7 +26,13 @@ export function ManageKidScreen() {
   const { childId } = route.params;
 
   const user = useKudoLoopStore((state) => state.users.find((candidate) => candidate.id === childId));
-  const parentId = useKudoLoopStore((state) => state.family.createdByParentId);
+  const users = useKudoLoopStore((state) => state.users);
+  const creatorId = useKudoLoopStore((state) => state.family.createdByParentId);
+  const activeUserId = useKudoLoopStore((state) => state.activeUserId);
+  const activeUser = resolveActiveUser(users, activeUserId, creatorId);
+  const parentId = activeUser?.id ?? creatorId;
+  const canAssign = can(activeUser, 'manage_assignments');
+  const canReward = can(activeUser, 'manage_rewards');
   const [tab, setTab] = useState<Tab>('assigned');
 
   if (!user) {
@@ -62,16 +69,16 @@ export function ManageKidScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'assigned' ? <AssignedTab childId={childId} /> : null}
-        {tab === 'chores' ? <ChoresTab childId={childId} /> : null}
-        {tab === 'schoolwork' ? <SchoolworkTab childId={childId} /> : null}
-        {tab === 'incentives' ? <IncentivesTab childId={childId} parentId={parentId} /> : null}
+        {tab === 'assigned' ? <AssignedTab childId={childId} canAssign={canAssign} /> : null}
+        {tab === 'chores' ? <ChoresTab childId={childId} canAssign={canAssign} /> : null}
+        {tab === 'schoolwork' ? <SchoolworkTab childId={childId} canAssign={canAssign} /> : null}
+        {tab === 'incentives' ? <IncentivesTab childId={childId} parentId={parentId} canReward={canReward} /> : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function AssignedTab({ childId }: { childId: string }) {
+function AssignedTab({ childId, canAssign }: { childId: string; canAssign: boolean }) {
   const tasks = useKudoLoopStore((state) => state.tasks);
   const templates = useKudoLoopStore((state) => state.templates);
   const removeTemplate = useKudoLoopStore((state) => state.removeTemplate);
@@ -104,28 +111,36 @@ function AssignedTab({ childId }: { childId: string }) {
                 {template.active ? '' : ' · paused'}
               </Text>
             </View>
-            <Switch
-              value={template.active}
-              onValueChange={(value) => setTemplateActive(template.id, value)}
-              trackColor={{ true: colors.teal, false: colors.line }}
-            />
+            {canAssign ? (
+              <Switch
+                value={template.active}
+                onValueChange={(value) => setTemplateActive(template.id, value)}
+                trackColor={{ true: colors.teal, false: colors.line }}
+              />
+            ) : null}
           </View>
-          <Pressable
-            style={styles.removeButton}
-            accessibilityRole="button"
-            onPress={() => removeTemplate(template.id)}
-          >
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </Pressable>
+          {canAssign ? (
+            <Pressable
+              style={styles.removeButton}
+              accessibilityRole="button"
+              onPress={() => removeTemplate(template.id)}
+            >
+              <Text style={styles.removeButtonText}>Remove</Text>
+            </Pressable>
+          ) : null}
         </Card>
       ))}
     </View>
   );
 }
 
-function ChoresTab({ childId }: { childId: string }) {
+function ChoresTab({ childId, canAssign }: { childId: string; canAssign: boolean }) {
   const assignCatalogChore = useKudoLoopStore((state) => state.assignCatalogChore);
   const assignedTitles = useAssignedTitles(childId);
+
+  if (!canAssign) {
+    return <PermissionNotice text="You need the “Assign chores” permission to add chores." />;
+  }
 
   return (
     <View style={styles.stack}>
@@ -151,7 +166,7 @@ function ChoresTab({ childId }: { childId: string }) {
   );
 }
 
-function SchoolworkTab({ childId }: { childId: string }) {
+function SchoolworkTab({ childId, canAssign }: { childId: string; canAssign: boolean }) {
   const assignCatalogSchoolwork = useKudoLoopStore((state) => state.assignCatalogSchoolwork);
   const addManualSchoolwork = useKudoLoopStore((state) => state.addManualSchoolwork);
   const assignedTitles = useAssignedTitles(childId);
@@ -182,6 +197,10 @@ function SchoolworkTab({ childId }: { childId: string }) {
     setDuration('30');
   };
 
+  if (!canAssign) {
+    return <PermissionNotice text="You need the “Assign chores” permission to add schoolwork." />;
+  }
+
   return (
     <View style={styles.stack}>
       <Card tone="mint">
@@ -211,7 +230,7 @@ function SchoolworkTab({ childId }: { childId: string }) {
   );
 }
 
-function IncentivesTab({ childId, parentId }: { childId: string; parentId: string }) {
+function IncentivesTab({ childId, parentId, canReward }: { childId: string; parentId: string; canReward: boolean }) {
   const incentives = useKudoLoopStore((state) => state.incentives.filter((item) => item.childId === childId));
   const addIncentive = useKudoLoopStore((state) => state.addIncentive);
   const removeIncentive = useKudoLoopStore((state) => state.removeIncentive);
@@ -234,6 +253,9 @@ function IncentivesTab({ childId, parentId }: { childId: string; parentId: strin
 
   return (
     <View style={styles.stack}>
+      {!canReward ? (
+        <PermissionNotice text="You need the “Manage rewards” permission to add incentives. Existing goals are shown below." />
+      ) : (
       <Card tone="sunny">
         <Text style={styles.cardTitle}>New incentive</Text>
         <Text style={styles.meta}>Something the kid works toward — an item, cash, or screen time.</Text>
@@ -258,6 +280,7 @@ function IncentivesTab({ childId, parentId }: { childId: string; parentId: strin
           <Text style={styles.primaryButtonText}>Add incentive</Text>
         </Pressable>
       </Card>
+      )}
 
       {incentives.length === 0 ? (
         <Card>
@@ -298,6 +321,15 @@ function CatalogRow({ title, meta, added, onAdd }: { title: string; meta: string
           <Text style={[styles.addButtonText, added ? styles.addButtonTextDone : null]}>{added ? 'Add again' : 'Assign'}</Text>
         </Pressable>
       </View>
+    </Card>
+  );
+}
+
+function PermissionNotice({ text }: { text: string }) {
+  return (
+    <Card tone="coral">
+      <Text style={styles.cardTitle}>Not allowed</Text>
+      <Text style={styles.meta}>{text}</Text>
     </Card>
   );
 }

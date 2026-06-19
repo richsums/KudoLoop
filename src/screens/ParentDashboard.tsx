@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { Card } from '../components/Card';
+import { can, resolveActiveUser } from '../domain/permissions';
 import { formatRewardAmount, rewardSummary } from '../domain/rewards';
 import type { TaskInstance } from '../domain/types';
 import { useKudoLoopStore } from '../store/useKudoLoopStore';
@@ -14,11 +15,20 @@ export function ParentDashboard() {
   const tasks = useKudoLoopStore((state) => state.tasks);
   const ledger = useKudoLoopStore((state) => state.ledger);
   const redemptions = useKudoLoopStore((state) => state.redemptions);
-  const parentId = useKudoLoopStore((state) => state.family.createdByParentId);
+  const creatorId = useKudoLoopStore((state) => state.family.createdByParentId);
+  const activeUserId = useKudoLoopStore((state) => state.activeUserId);
+  const setActiveUser = useKudoLoopStore((state) => state.setActiveUser);
   const approveTask = useKudoLoopStore((state) => state.approveTask);
   const rejectTask = useKudoLoopStore((state) => state.rejectTask);
   const awardManualBonus = useKudoLoopStore((state) => state.awardManualBonus);
   const approveRedemption = useKudoLoopStore((state) => state.approveRedemption);
+
+  const adults = users.filter((user) => user.role !== 'child');
+  const activeUser = resolveActiveUser(users, activeUserId, creatorId);
+  const actingId = activeUser?.id ?? creatorId;
+  const canApprove = can(activeUser, 'approve_tasks');
+  const canReward = can(activeUser, 'manage_rewards');
+  const canAssign = can(activeUser, 'manage_assignments');
 
   const submittedTasks = tasks.filter((task) => task.status === 'submitted');
   const overdueTasks = tasks.filter((task) => task.status === 'todo' && new Date(task.dueAt).getTime() < Date.now());
@@ -36,13 +46,40 @@ export function ParentDashboard() {
           <Metric label="Overdue" value={String(overdueTasks.length)} />
           <Metric label="Requests" value={String(requestedRedemptions.length)} />
         </View>
-        <Pressable
-          style={styles.primaryButton}
-          accessibilityRole="button"
-          onPress={() => navigation.navigate('CreateChore')}
-        >
-          <Text style={styles.primaryButtonText}>+ New chore</Text>
-        </Pressable>
+        {adults.length > 1 ? (
+          <View style={styles.actingRow}>
+            <Text style={styles.actingLabel}>Acting as</Text>
+            <View style={styles.chipWrap}>
+              {adults.map((adult) => {
+                const selected = adult.id === actingId;
+                return (
+                  <Pressable
+                    key={adult.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setActiveUser(adult.id)}
+                    style={[styles.chip, selected ? styles.chipSelected : null]}
+                  >
+                    <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
+                      {adult.displayName}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+        {canAssign ? (
+          <Pressable
+            style={styles.primaryButton}
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CreateChore')}
+          >
+            <Text style={styles.primaryButtonText}>+ New chore</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.permHint}>{activeUser?.displayName} can’t create chores (needs “Assign chores”).</Text>
+        )}
       </Card>
 
       <Text style={styles.heading}>Children</Text>
@@ -66,19 +103,23 @@ export function ParentDashboard() {
               <Metric label="Points" value={formatRewardAmount('points', child.balances.points)} />
             </View>
             <View style={styles.actions}>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => awardManualBonus(child.userId, 'screen_minutes', 10, 'Parent quick bonus', parentId)}
-              >
-                <Text style={styles.secondaryButtonText}>Award 10 min</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryButton}
-                accessibilityRole="button"
-                onPress={() => navigation.navigate('ManageKid', { childId: child.userId })}
-              >
-                <Text style={styles.secondaryButtonText}>Manage</Text>
-              </Pressable>
+              {canReward ? (
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => awardManualBonus(child.userId, 'screen_minutes', 10, 'Parent quick bonus', actingId)}
+                >
+                  <Text style={styles.secondaryButtonText}>Award 10 min</Text>
+                </Pressable>
+              ) : null}
+              {canAssign ? (
+                <Pressable
+                  style={styles.secondaryButton}
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('ManageKid', { childId: child.userId })}
+                >
+                  <Text style={styles.secondaryButtonText}>Manage</Text>
+                </Pressable>
+              ) : null}
             </View>
           </Card>
         );
@@ -86,12 +127,16 @@ export function ParentDashboard() {
 
       <Text style={styles.heading}>Approval queue</Text>
       {submittedTasks.length === 0 ? <EmptyState text="No proof waiting for review." /> : null}
+      {submittedTasks.length > 0 && !canApprove ? (
+        <EmptyState text={`${activeUser?.displayName} can’t approve tasks (needs “Approve tasks”).`} />
+      ) : null}
       {submittedTasks.map((task) => (
         <TaskApprovalCard
           key={task.id}
           task={task}
-          onApprove={() => approveTask(task.id, parentId)}
-          onReject={() => rejectTask(task.id, parentId, 'Please send a clearer photo.')}
+          canApprove={canApprove}
+          onApprove={() => approveTask(task.id, actingId)}
+          onReject={() => rejectTask(task.id, actingId, 'Please send a clearer photo.')}
         />
       ))}
 
@@ -104,9 +149,13 @@ export function ParentDashboard() {
           <Card key={redemption.id} tone="sunny">
             <Text style={styles.cardTitle}>{child?.displayName} wants {redemption.amount} minutes</Text>
             <Text style={styles.body}>Target device: {redemption.targetDevice ?? 'Any screen'}</Text>
-            <Pressable style={styles.primaryButton} onPress={() => approveRedemption(redemption.id, parentId)}>
-              <Text style={styles.primaryButtonText}>Approve and deduct balance</Text>
-            </Pressable>
+            {canApprove ? (
+              <Pressable style={styles.primaryButton} onPress={() => approveRedemption(redemption.id, actingId)}>
+                <Text style={styles.primaryButtonText}>Approve and deduct balance</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.permHint}>Needs “Approve tasks” permission.</Text>
+            )}
           </Card>
         );
       })}
@@ -126,10 +175,12 @@ export function ParentDashboard() {
 
 function TaskApprovalCard({
   task,
+  canApprove,
   onApprove,
   onReject,
 }: {
   task: TaskInstance;
+  canApprove: boolean;
   onApprove: () => void;
   onReject: () => void;
 }) {
@@ -143,14 +194,16 @@ function TaskApprovalCard({
       <Text style={styles.cardTitle}>{template?.title}</Text>
       <Text style={styles.body}>{child?.displayName} submitted proof: {task.notes}</Text>
       <Text style={styles.meta}>Reward: {template ? rewardSummary(template.rewardRules) : 'No reward'}</Text>
-      <View style={styles.actions}>
-        <Pressable style={styles.primaryButton} onPress={onApprove}>
-          <Text style={styles.primaryButtonText}>Approve</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={onReject}>
-          <Text style={styles.secondaryButtonText}>Request resubmission</Text>
-        </Pressable>
-      </View>
+      {canApprove ? (
+        <View style={styles.actions}>
+          <Pressable style={styles.primaryButton} onPress={onApprove}>
+            <Text style={styles.primaryButtonText}>Approve</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={onReject}>
+            <Text style={styles.secondaryButtonText}>Request resubmission</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -282,5 +335,46 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.tealDark,
     fontWeight: '900',
+  },
+  actingRow: {
+    marginTop: spacing.md,
+  },
+  actingLabel: {
+    color: colors.gray,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  chip: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  chipSelected: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  chipText: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  chipTextSelected: {
+    color: colors.white,
+  },
+  permHint: {
+    color: colors.gray,
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginTop: spacing.md,
   },
 });

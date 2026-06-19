@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { z } from 'zod';
 
 import type { Permission } from '../domain/types';
+import { persistStorage } from './persistStorage';
 
 export const TOTAL_STEPS = 4;
 
@@ -82,7 +84,9 @@ export function isStepComplete(step: number, draft: OnboardingDraft): boolean {
   return true;
 }
 
-export const useOnboardingStore = create<OnboardingState>((set, get) => ({
+export const useOnboardingStore = create<OnboardingState>()(
+  persist(
+    (set, get) => ({
   ...initialDraft,
   step: 0,
   setupComplete: false,
@@ -160,4 +164,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ setupComplete: true });
   },
   restart: () => set({ ...initialDraft, step: 0, setupComplete: false }),
-}));
+    }),
+    {
+      name: 'kudoloop-onboarding',
+      storage: createJSONStorage(() => persistStorage),
+      partialize: (state) => ({
+        familyName: state.familyName,
+        parentName: state.parentName,
+        adults: state.adults,
+        kids: state.kids,
+        setupComplete: state.setupComplete,
+      }),
+    },
+  ),
+);

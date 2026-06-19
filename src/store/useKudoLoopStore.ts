@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { mockFamily } from '../data/mockFamily';
+import { persistStorage } from './persistStorage';
 import type { ChoreCatalogItem, SchoolworkCatalogItem } from '../domain/catalog';
 import { buildChore, type NewChoreInput } from '../domain/chores';
 import { applyRewardMutation, buildRequestId } from '../domain/rewards';
@@ -37,6 +39,8 @@ type StoreState = {
   notifications: AppNotification[];
   rewardConfig: RewardConfig;
   processedRequestIds: string[];
+  activeUserId: string;
+  setActiveUser: (userId: string) => void;
   hydrate: (snapshot: KudoLoopStateSnapshot) => void;
   addChore: (input: NewChoreInput) => void;
   assignCatalogChore: (childId: string, item: ChoreCatalogItem) => void;
@@ -127,6 +131,7 @@ function snapshotToState(snapshot: KudoLoopStateSnapshot) {
     notifications: snapshot.notifications,
     rewardConfig: snapshot.rewardConfig,
     processedRequestIds: snapshot.ledger.map((entry) => entry.requestId),
+    activeUserId: snapshot.family.createdByParentId,
   };
 }
 
@@ -149,8 +154,11 @@ function makeNotification(
   };
 }
 
-export const useKudoLoopStore = create<StoreState>((set, get) => ({
+export const useKudoLoopStore = create<StoreState>()(
+  persist(
+    (set, get) => ({
   ...snapshotToState(mockFamily),
+  setActiveUser: (userId) => set({ activeUserId: userId }),
   hydrate: (snapshot) => set(snapshotToState(snapshot)),
   addChore: (input) => {
     set((state) => {
@@ -490,4 +498,25 @@ export const useKudoLoopStore = create<StoreState>((set, get) => ({
       return nextState;
     });
   },
-}));
+    }),
+    {
+      name: 'kudoloop-data',
+      storage: createJSONStorage(() => persistStorage),
+      partialize: (state) => ({
+        family: state.family,
+        users: state.users,
+        templates: state.templates,
+        children: state.children,
+        tasks: state.tasks,
+        ledger: state.ledger,
+        redemptions: state.redemptions,
+        incentives: state.incentives,
+        wishlist: state.wishlist,
+        notifications: state.notifications,
+        rewardConfig: state.rewardConfig,
+        processedRequestIds: state.processedRequestIds,
+        activeUserId: state.activeUserId,
+      }),
+    },
+  ),
+);
