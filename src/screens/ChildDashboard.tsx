@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card } from '../components/Card';
 import { SegmentedTabs } from '../components/SegmentedTabs';
 import { goalProgress, pointsToMoney, pointsToScreenMinutes } from '../domain/incentives';
+import { badgeStatuses, lifetimePoints, totalApprovals } from '../domain/streaks';
 import { formatRewardAmount, rewardSummary } from '../domain/rewards';
 import type { TaskInstance } from '../domain/types';
 import { isSupabaseConfigured } from '../lib/env';
@@ -22,6 +23,7 @@ export function ChildDashboard() {
   const allRedemptions = useKudoLoopStore((state) => state.redemptions);
   const allIncentives = useKudoLoopStore((state) => state.incentives);
   const allWishlist = useKudoLoopStore((state) => state.wishlist);
+  const ledger = useKudoLoopStore((state) => state.ledger);
   const rewardConfig = useKudoLoopStore((state) => state.rewardConfig);
   const familyId = useKudoLoopStore((state) => state.family.id);
   const submitTaskProof = useKudoLoopStore((state) => state.submitTaskProof);
@@ -51,6 +53,14 @@ export function ChildDashboard() {
   }
 
   const childId = activeChildId;
+
+  const badges = badgeStatuses({
+    streak: child.streakDays,
+    approvals: totalApprovals(ledger, childId),
+    points: lifetimePoints(ledger, childId),
+  });
+  const earnedBadges = badges.filter((badge) => badge.earned);
+  const nextBadge = badges.find((badge) => !badge.earned);
 
   const handleSubmit = async (task: TaskInstance, needsProof: boolean) => {
     if (needsProof) {
@@ -139,6 +149,34 @@ export function ChildDashboard() {
           </Card>
         );
       })}
+
+      <Text style={styles.heading}>Badges</Text>
+      <Card>
+        {earnedBadges.length === 0 ? (
+          <Text style={styles.meta}>No badges yet — finish quests to start earning them!</Text>
+        ) : (
+          <View style={styles.badgeWrap}>
+            {earnedBadges.map((status) => (
+              <View key={status.badge.id} style={styles.achBadge}>
+                <Text style={styles.badgeEmoji}>{status.badge.emoji}</Text>
+                <Text style={styles.badgeLabel}>{status.badge.label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {nextBadge ? (
+          <View style={styles.nextBadge}>
+            <Text style={styles.meta}>
+              Next: {nextBadge.badge.emoji} {nextBadge.badge.label} ({nextBadge.current}/{nextBadge.badge.threshold})
+            </Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(nextBadge.progress * 100)}%` }]} />
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.meta}>🎉 Every badge earned — amazing!</Text>
+        )}
+      </Card>
 
       <Text style={styles.heading}>Cash in your points</Text>
       <Card tone="mint">
@@ -419,5 +457,33 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontSize: 13,
     fontWeight: '800',
+  },
+  badgeWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  achBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.mint,
+    borderColor: '#BCECE7',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    width: 92,
+  },
+  badgeEmoji: {
+    fontSize: 26,
+  },
+  badgeLabel: {
+    color: colors.navy,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  nextBadge: {
+    marginTop: spacing.md,
   },
 });

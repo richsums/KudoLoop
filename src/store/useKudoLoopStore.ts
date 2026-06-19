@@ -7,6 +7,7 @@ import type { ChoreCatalogItem, SchoolworkCatalogItem } from '../domain/catalog'
 import { buildChore, type NewChoreInput } from '../domain/chores';
 import { rollForward } from '../domain/recurrence';
 import { applyRewardMutation, buildRequestId } from '../domain/rewards';
+import { computeStreak } from '../domain/streaks';
 import type {
   AppNotification,
   ChildProfile,
@@ -119,6 +120,10 @@ function mutateChildReward(
   };
 }
 
+function recomputeStreaks(children: ChildProfile[], ledger: RewardLedgerEntry[], nowIso: string): ChildProfile[] {
+  return children.map((child) => ({ ...child, streakDays: computeStreak(ledger, child.userId, nowIso) }));
+}
+
 function snapshotToState(snapshot: KudoLoopStateSnapshot) {
   return {
     family: snapshot.family,
@@ -163,7 +168,13 @@ export const useKudoLoopStore = create<StoreState>()(
   setActiveUser: (userId) => set({ activeUserId: userId }),
   hydrate: (snapshot) => set(snapshotToState(snapshot)),
   rollForwardTasks: () =>
-    set((state) => ({ tasks: rollForward({ templates: state.templates, tasks: state.tasks }, new Date().toISOString()) })),
+    set((state) => {
+      const nowIso = new Date().toISOString();
+      return {
+        tasks: rollForward({ templates: state.templates, tasks: state.tasks }, nowIso),
+        children: recomputeStreaks(state.children, state.ledger, nowIso),
+      };
+    }),
   addChore: (input) => {
     set((state) => {
       const { template, tasks } = buildChore(input, state.family.id, `${Date.now()}`, new Date().toISOString());
@@ -399,7 +410,10 @@ export const useKudoLoopStore = create<StoreState>()(
         );
       });
 
-      return nextState;
+      return {
+        ...nextState,
+        children: recomputeStreaks(nextState.children, nextState.ledger, new Date().toISOString()),
+      };
     });
   },
   rejectTask: (taskId, parentId, note) => {
