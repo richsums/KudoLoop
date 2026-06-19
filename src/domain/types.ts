@@ -80,6 +80,9 @@ export const proofAssetSchema = z.object({
   mediaType: z.string(),
   createdAt: z.string(),
   moderationStatus: z.enum(['pending', 'approved', 'rejected']),
+  // Local/demo image (data or file URI) shown to the parent when no backend is
+  // configured. With Supabase, the private signed URL is fetched on demand.
+  localUri: z.string().optional(),
 });
 
 export const taskInstanceSchema = z.object({

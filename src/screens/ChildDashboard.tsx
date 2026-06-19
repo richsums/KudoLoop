@@ -7,7 +7,7 @@ import { goalProgress, pointsToMoney, pointsToScreenMinutes } from '../domain/in
 import { formatRewardAmount, rewardSummary } from '../domain/rewards';
 import type { TaskInstance } from '../domain/types';
 import { isSupabaseConfigured } from '../lib/env';
-import { pickProofImage, uploadProofImage } from '../lib/proof';
+import { pickLocalProof, pickProofImage, uploadProofImage } from '../lib/proof';
 import { useKudoLoopStore } from '../store/useKudoLoopStore';
 import { colors, radius, spacing } from '../theme/tokens';
 
@@ -53,22 +53,33 @@ export function ChildDashboard() {
   const childId = activeChildId;
 
   const handleSubmit = async (task: TaskInstance, needsProof: boolean) => {
-    // When the backend is configured, a proof task uploads a real private image
-    // before flipping the task to "submitted". Otherwise we simulate locally.
-    if (needsProof && isSupabaseConfigured) {
-      try {
-        const uri = await pickProofImage();
-        if (!uri) {
+    if (needsProof) {
+      if (isSupabaseConfigured) {
+        // Backend mode: upload a private image, then flip to "submitted".
+        try {
+          const uri = await pickProofImage();
+          if (!uri) {
+            return;
+          }
+          await uploadProofImage({ familyId, taskId: task.id, uploaderId: childId, localUri: uri });
+        } catch (error) {
+          console.warn('Proof upload failed', error);
           return;
         }
-        await uploadProofImage({ familyId, taskId: task.id, uploaderId: childId, localUri: uri });
-      } catch (error) {
-        console.warn('Proof upload failed', error);
+        submitTaskProof(task.id, childId, 'Proof photo uploaded.');
         return;
       }
+
+      // Local/demo mode: capture the image so the parent can actually see it.
+      const localUri = await pickLocalProof();
+      if (!localUri) {
+        return;
+      }
+      submitTaskProof(task.id, childId, 'Proof photo uploaded.', localUri);
+      return;
     }
 
-    submitTaskProof(task.id, childId, needsProof ? 'Proof photo uploaded.' : 'Marked done in kid mode.');
+    submitTaskProof(task.id, childId, 'Marked done in kid mode.');
   };
 
   return (

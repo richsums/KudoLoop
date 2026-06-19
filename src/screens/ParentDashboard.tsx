@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { Card } from '../components/Card';
@@ -188,11 +188,15 @@ function TaskApprovalCard({
     state.templates.find((candidate) => candidate.id === task.templateId),
   );
   const child = useKudoLoopStore((state) => state.users.find((candidate) => candidate.id === task.childId));
+  const proofUri = task.proofAssets.find((proof) => proof.localUri)?.localUri;
 
   return (
     <Card tone="coral">
       <Text style={styles.cardTitle}>{template?.title}</Text>
       <Text style={styles.body}>{child?.displayName} submitted proof: {task.notes}</Text>
+      {proofUri ? (
+        <Image source={{ uri: proofUri }} style={styles.proofImage} resizeMode="cover" accessibilityLabel="Submitted proof photo" />
+      ) : null}
       <Text style={styles.meta}>Reward: {template ? rewardSummary(template.rewardRules) : 'No reward'}</Text>
       {canApprove ? (
         <View style={styles.actions}>
@@ -376,5 +380,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
     marginTop: spacing.md,
+  },
+  proofImage: {
+    backgroundColor: colors.line,
+    borderRadius: radius.sm,
+    height: 180,
+    marginTop: spacing.sm,
+    width: '100%',
   },
 });

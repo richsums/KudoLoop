@@ -83,6 +83,19 @@ describe('incentives, wishlist, and notifications', () => {
     expect(state.incentives.find((i) => i.title === 'Lego set')).toMatchObject({ pointCost: 800, type: 'item' });
   });
 
+  it('stores a proof image and notifies the parent on submission', () => {
+    const store = useKudoLoopStore.getState();
+    store.assignCatalogChore('kid-1', CHORE_CATALOG[0]);
+    const task = useKudoLoopStore.getState().tasks.find((t) => t.childId === 'kid-1')!;
+
+    useKudoLoopStore.getState().submitTaskProof(task.id, 'kid-1', 'Done!', 'data:image/jpeg;base64,AAAA');
+    const state = useKudoLoopStore.getState();
+    const updated = state.tasks.find((t) => t.id === task.id)!;
+    expect(updated.status).toBe('submitted');
+    expect(updated.proofAssets[0]?.localUri).toBe('data:image/jpeg;base64,AAAA');
+    expect(state.notifications[0]).toMatchObject({ type: 'task_completed', targetType: 'task', read: false });
+  });
+
   it('cashout request creates a redemption and a notification, and marks-all clears unread', () => {
     useKudoLoopStore.getState().requestCashout('kid-1', 500);
     let state = useKudoLoopStore.getState();

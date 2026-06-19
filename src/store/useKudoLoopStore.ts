@@ -44,6 +44,7 @@ type StoreState = {
   setActiveUser: (userId: string) => void;
   hydrate: (snapshot: KudoLoopStateSnapshot) => void;
   rollForwardTasks: () => void;
+  submitTaskProof: (taskId: string, childId: string, note: string, localUri?: string) => void;
   addChore: (input: NewChoreInput) => void;
   assignCatalogChore: (childId: string, item: ChoreCatalogItem) => void;
   assignCatalogSchoolwork: (childId: string, item: SchoolworkCatalogItem) => void;
@@ -64,7 +65,6 @@ type StoreState = {
   requestCashout: (childId: string, points: number) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
-  submitTaskProof: (taskId: string, childId: string, note: string) => void;
   approveTask: (taskId: string, parentId: string) => void;
   rejectTask: (taskId: string, parentId: string, note: string) => void;
   awardManualBonus: (
@@ -320,7 +320,7 @@ export const useKudoLoopStore = create<StoreState>()(
       notifications: state.notifications.map((notification) => ({ ...notification, read: true })),
     }));
   },
-  submitTaskProof: (taskId, childId, note) => {
+  submitTaskProof: (taskId, childId, note, localUri) => {
     const state = get();
     const familyId = state.family.id;
     const task = state.tasks.find((candidate) => candidate.id === taskId);
@@ -335,6 +335,7 @@ export const useKudoLoopStore = create<StoreState>()(
       mediaType: 'image/jpeg',
       createdAt: new Date().toISOString(),
       moderationStatus: 'pending',
+      localUri,
     };
 
     const notification = makeNotification(

@@ -30,6 +30,38 @@ export async function pickProofImage(): Promise<string | null> {
   return result.assets[0]?.uri ?? null;
 }
 
+/**
+ * Pick an image and return a persistable URI for local/demo mode (no backend).
+ * Prefers a base64 data URL so it survives a reload via persisted storage;
+ * falls back to the asset URI. Returns null if cancelled/denied.
+ */
+export async function pickLocalProof(): Promise<string | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    return null;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 0.4,
+    base64: true,
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  const asset = result.assets[0];
+  if (!asset) {
+    return null;
+  }
+  if (asset.base64) {
+    const mime = asset.mimeType ?? 'image/jpeg';
+    return `data:${mime};base64,${asset.base64}`;
+  }
+  return asset.uri ?? null;
+}
+
 /** Resize + JPEG-compress an image. Best-effort: returns the original URI on failure. */
 async function compress(uri: string, width: number, quality: number): Promise<string> {
   try {
