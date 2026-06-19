@@ -5,6 +5,7 @@ import { mockFamily } from '../data/mockFamily';
 import { persistStorage } from './persistStorage';
 import type { ChoreCatalogItem, SchoolworkCatalogItem } from '../domain/catalog';
 import { buildChore, type NewChoreInput } from '../domain/chores';
+import { rollForward } from '../domain/recurrence';
 import { applyRewardMutation, buildRequestId } from '../domain/rewards';
 import type {
   AppNotification,
@@ -42,6 +43,7 @@ type StoreState = {
   activeUserId: string;
   setActiveUser: (userId: string) => void;
   hydrate: (snapshot: KudoLoopStateSnapshot) => void;
+  rollForwardTasks: () => void;
   addChore: (input: NewChoreInput) => void;
   assignCatalogChore: (childId: string, item: ChoreCatalogItem) => void;
   assignCatalogSchoolwork: (childId: string, item: SchoolworkCatalogItem) => void;
@@ -160,6 +162,8 @@ export const useKudoLoopStore = create<StoreState>()(
   ...snapshotToState(mockFamily),
   setActiveUser: (userId) => set({ activeUserId: userId }),
   hydrate: (snapshot) => set(snapshotToState(snapshot)),
+  rollForwardTasks: () =>
+    set((state) => ({ tasks: rollForward({ templates: state.templates, tasks: state.tasks }, new Date().toISOString()) })),
   addChore: (input) => {
     set((state) => {
       const { template, tasks } = buildChore(input, state.family.id, `${Date.now()}`, new Date().toISOString());

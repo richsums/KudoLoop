@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { OnboardingFlow } from './src/screens/OnboardingFlow';
+import { useKudoLoopStore } from './src/store/useKudoLoopStore';
 import { useOnboardingStore } from './src/store/useOnboardingStore';
 import { colors } from './src/theme/tokens';
 
@@ -24,6 +25,15 @@ const navTheme: Theme = {
 export default function App() {
   const queryClient = useMemo(() => new QueryClient(), []);
   const setupComplete = useOnboardingStore((state) => state.setupComplete);
+  const rollForwardTasks = useKudoLoopStore((state) => state.rollForwardTasks);
+
+  // On open (once setup is done), regenerate today's recurring chores/schoolwork
+  // and expire stale ones.
+  useEffect(() => {
+    if (setupComplete) {
+      rollForwardTasks();
+    }
+  }, [setupComplete, rollForwardTasks]);
 
   return (
     <SafeAreaProvider>

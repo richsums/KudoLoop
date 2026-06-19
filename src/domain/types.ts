@@ -92,6 +92,9 @@ export const taskInstanceSchema = z.object({
   approvedBy: z.string().optional(),
   notes: z.string().optional(),
   proofAssets: z.array(proofAssetSchema),
+  // Recurrence period this instance belongs to: 'YYYY-MM-DD' for daily/by-day
+  // templates, 'YYYY-Www' for weekly. Absent for legacy/ad-hoc instances.
+  periodKey: z.string().optional(),
 });
 
 export const rewardLedgerEntrySchema = z.object({
